@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}系统配置{% endblock %}{% block content %}
+<div class="title-row"><div><h1>系统配置</h1><p class="muted">敏感凭据使用 SECRET_KEY 加密后保存在数据库，页面不会回显明文。案件状态查询使用 RPA 方式（Chrome 浏览器自动化），无需额外配置 API。</p></div></div>
+<section class="stats config-status"><article><b>{{ '已配置' if status.smtp_secret else '未配置' }}</b><span>SMTP 发件</span></article><article><b>{{ '已配置' if status.recipients else '未配置' }}</b><span>企业收件人</span></article></section>
+<form method="post" class="grid two settings-grid">
+  <section class="panel"><h2>SMTP 邮件配置</h2><div class="stack"><label>SMTP 主机<input name="smtp_host" value="{{ config.smtp_host }}" required></label><div class="inline-form"><label>端口<input name="smtp_port" type="number" value="{{ config.smtp_port }}" required></label><label class="checkbox"><input name="smtp_use_ssl" type="checkbox" value="true" {% if config.smtp_use_ssl %}checked{% endif %}>使用 SSL</label></div><label>发件邮箱<input name="smtp_username" type="email" value="{{ config.smtp_username }}"></label><label>SMTP 授权码<input name="smtp_auth_code" type="password" placeholder="{% if status.smtp_secret %}已保存；留空则保持不变{% else %}请输入授权码{% endif %}" autocomplete="new-password"></label><label>发件人名称<input name="smtp_from_name" value="{{ config.smtp_from_name }}"></label><label>企业收件邮箱<input name="default_notify_emails" value="{{ config.default_notify_emails }}" placeholder="a@example.com,b@example.com"></label><p class="muted">多个收件人使用英文逗号分隔。推荐使用 163 邮箱，在设置中开启 POP3/SMTP 服务获取授权码。</p></div></section>
+  <section class="panel"><h2>查询方式</h2><div class="stack"><p><b>Chrome RPA 自动查询</b></p><p class="muted">系统通过连接本地 Chrome 浏览器，自动访问 USCIS 官网填写收据编号并提取案件状态。macOS 使用系统自带 Chrome，Linux/Docker 使用 Chromium + Xvfb。</p><p class="muted">首次查询会触发 Cloudflare 人机验证，系统会自动等待完成。无需申请 USCIS API 密钥。</p></div></section>
+  <div><button>保存系统配置</button></div>
+</form>
+{% endblock %}

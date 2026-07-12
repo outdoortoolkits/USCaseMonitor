@@ -1,0 +1,223 @@
+{% extends "base.html" %}{% block title %}提醒规则{% endblock %}{% block content %}
+<div class="title-row">
+  <h1>提醒规则模板</h1>
+  <button class="btn-primary" onclick="showCreateModal()">＋ 新建规则</button>
+</div>
+
+{# ── FAQ 使用指南 ── #}
+<details class="faq-details" style="margin-bottom:20px">
+  <summary>📖 提醒规则使用指南（点击展开）</summary>
+  <div class="faq-content">
+    <div class="faq-section">
+      <h3>什么是提醒规则？</h3>
+      <p>提醒规则是全局模板，定义了在什么条件下触发提醒通知。规则创建后，每个<strong>客户</strong>可以自由选择启用哪些规则。当客户的案件状态发生变化或满足规则条件时，系统会自动生成通知并发送邮件。</p>
+    </div>
+
+    <div class="faq-section">
+      <h3>规则类型说明</h3>
+      <table>
+        <thead><tr><th>类型</th><th>中文</th><th>说明</th><th>适用场景</th></tr></thead>
+        <tbody>
+          <tr><td><code>STATUS_CHANGED</code></td><td>状态变更</td><td>当案件状态发生变化时触发</td><td>监控任何状态更新，第一时间知晓进展</td></tr>
+          <tr><td><code>STATUS_MATCHED</code></td><td>状态匹配</td><td>当案件状态匹配指定标签时触发（如 APPROVED、RFE）</td><td>关注特定结果，如批准、补件等</td></tr>
+          <tr><td><code>RELATIVE_DATE</code></td><td>相对日期</td><td>基于某个锚点日期 + 偏移天数触发</td><td>如"收据日期后 90 天提醒"</td></tr>
+          <tr><td><code>ONE_TIME_DATE</code></td><td>一次性日期</td><td>在指定日期触发一次</td><td>已知的截止日期、面谈日期等</td></tr>
+          <tr><td><code>RECURRING</code></td><td>周期提醒</td><td>按固定间隔（天）循环触发</td><td>定期检查案件状态，如每 7 天提醒一次</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="faq-section">
+      <h3>如何使用？</h3>
+      <ol>
+        <li><strong>第一步：创建规则模板</strong> — 在此页面创建提醒规则，定义触发条件和邮件模板。</li>
+        <li><strong>第二步：为客户关联规则</strong> — 进入<strong>客户详情页</strong> → "提醒规则" Tab，勾选该客户需要的规则。</li>
+        <li><strong>第三步：系统自动监控</strong> — 当案件状态变化时，系统自动匹配规则并生成通知。</li>
+      </ol>
+    </div>
+
+    <div class="faq-section">
+      <h3>邮件模板变量</h3>
+      <p>在邮件标题和正文中可以使用以下变量，系统会自动替换：</p>
+      <table>
+        <thead><tr><th>变量</th><th>含义</th><th>示例</th></tr></thead>
+        <tbody>
+          <tr><td><code v-pre>{{ name }}</code></td><td>客户名称</td><td>张三</td></tr>
+          <tr><td><code v-pre>{{ form_type }}</code></td><td>表格类型</td><td>I-485</td></tr>
+          <tr><td><code v-pre>{{ receipt_number }}</code></td><td>收据编号</td><td>EAC1234567890</td></tr>
+          <tr><td><code v-pre>{{ status_tag }}</code></td><td>状态标签</td><td>APPROVED</td></tr>
+          <tr><td><code v-pre>{{ status_title }}</code></td><td>状态标题</td><td>Case Was Approved</td></tr>
+          <tr><td><code v-pre>{{ status_description }}</code></td><td>状态详情</td><td>On July 10, 2026, we approved your Form I-485...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="faq-section">
+      <h3>常见问题</h3>
+      <p><strong>Q: 规则停用后还会触发吗？</strong><br>A: 不会。停用的规则不会匹配，已关联的客户也不会收到通知。</p>
+      <p><strong>Q: 删除规则模板会影响已有通知吗？</strong><br>A: 删除规则会同时移除所有客户与该规则的关联，但已生成的通知记录不会删除。</p>
+      <p><strong>Q: 一个客户可以关联多个规则吗？</strong><br>A: 可以。客户可以根据需要选择任意数量的规则。</p>
+    </div>
+  </div>
+</details>
+
+{# ── 规则列表 ── #}
+{% if rules %}
+<div class="panel">
+  <table>
+    <thead>
+      <tr>
+        <th>规则名称</th>
+        <th>类型</th>
+        <th>描述</th>
+        <th>匹配状态</th>
+        <th>状态</th>
+        <th>创建时间</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for rule in rules %}
+    <tr>
+      <td><b>{{ rule.name }}</b></td>
+      <td><span class="tag">{{ rule_type_labels.get(rule.rule_type.value, rule.rule_type.value) }}</span></td>
+      <td class="muted">{{ rule.description or '-' }}</td>
+      <td>{% if rule.status_match %}<code>{{ rule.status_match }}</code>{% else %}<span class="muted">不限</span>{% endif %}</td>
+      <td>{% if rule.enabled %}<span class="dot dot-green"></span> 启用{% else %}<span class="dot dot-gray"></span> 停用{% endif %}</td>
+      <td class="muted">{{ rule.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn-sm-ghost" onclick="showEditModal({{ rule.id }})">编辑</button>
+          <form method="post" action="/rules/{{ rule.id }}/toggle" class="inline"><button class="btn-sm-ghost">{% if rule.enabled %}停用{% else %}启用{% endif %}</button></form>
+          <form method="post" action="/rules/{{ rule.id }}/delete" class="inline" onsubmit="return confirm('确定删除规则「{{ rule.name|e }}」？关联此规则的客户也将被移除。')"><button class="btn-sm-danger">删除</button></form>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="panel empty">
+  <p>暂无提醒规则模板</p>
+  <button class="btn-primary" onclick="showCreateModal()">＋ 创建第一个规则</button>
+</div>
+{% endif %}
+
+{# ── 创建/编辑 Modal ── #}
+<div class="modal-overlay" id="rule-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-head">
+      <h2 id="modal-title">新建提醒规则</h2>
+      <button class="modal-close" onclick="hideModal()">&times;</button>
+    </div>
+    <form id="rule-form" method="post" action="/rules" class="form-grid">
+      <input type="hidden" id="rule-id" name="rule_id" value="">
+      <label>规则名称<input name="name" id="rule-name" required placeholder="例如：批准通知"></label>
+      <label>规则类型<select name="rule_type" id="rule-type" required onchange="onTypeChange()">
+        {% for t in rule_types %}<option value="{{ t.value }}">{{ rule_type_labels[t.value] }}</option>{% endfor %}
+      </select></label>
+      <label>描述<input name="description" id="rule-desc" placeholder="可选，描述规则用途"></label>
+      <label id="anchor-group">日期基准<select name="anchor_type" id="rule-anchor">
+        <option value="">不适用</option>{% for a in anchor_types %}<option value="{{ a.value }}">{{ anchor_type_labels[a.value] }}</option>{% endfor %}
+      </select></label>
+      <label id="offset-group">偏移天数<input name="days_offset" id="rule-days-offset" type="number" placeholder="0"></label>
+      <label id="custom-date-group">指定日期<input name="custom_date" id="rule-custom-date" type="date"></label>
+      <label id="recurrence-group">循环间隔（天）<input name="recurrence_days" id="rule-recurrence" type="number" min="1" placeholder="7"></label>
+      <label id="status-match-group">匹配状态<select name="status_match" id="rule-status-match">
+        <option value="">不限制</option><option>APPROVED</option><option>RFE</option><option>DENIED</option><option>RECEIVED</option><option>TRANSFERRED</option><option>INTERVIEW</option>
+      </select></label>
+      <label class="wide">邮件标题<input name="subject_template" id="rule-subject" required value="[{{ '{{status_tag}}' }}] {{ '{{name}}' }} - {{ '{{form_type}}' }}"></label>
+      <label class="wide">邮件正文<textarea name="body_template" id="rule-body" required>{{ '{{name}}' }} 的 {{ '{{form_type}}' }}（{{ '{{receipt_number}}' }}）需要处理。&#10;&#10;{{ '{{status_title}}' }}&#10;{{ '{{status_description}}' }}</textarea></label>
+      <div class="wide" style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn-secondary" onclick="hideModal()">取消</button>
+        <button type="submit" id="modal-submit-btn">创建规则</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// 将规则模板数据以 JSON 形式存入 JS，避免 onclick 属性传递导致的特殊字符乱码
+var RULE_DATA = {
+  {% for rule in rules %}
+  {{ rule.id }}: {
+    name: {{ rule.name|tojson }},
+    desc: {{ rule.description|tojson }},
+    type: {{ rule.rule_type.value|tojson }},
+    anchor: {{ (rule.anchor_type.value if rule.anchor_type else '')|tojson }},
+    daysOffset: {{ (rule.days_offset if rule.days_offset else '')|tojson }},
+    customDate: {{ (rule.custom_date.isoformat() if rule.custom_date else '')|tojson }},
+    recurrence: {{ (rule.recurrence_days if rule.recurrence_days else '')|tojson }},
+    statusMatch: {{ rule.status_match|tojson }},
+    subject: {{ rule.subject_template|tojson }},
+    body: {{ rule.body_template|tojson }}
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+};
+
+function showCreateModal() {
+  document.getElementById('modal-title').textContent = '新建提醒规则';
+  document.getElementById('modal-submit-btn').textContent = '创建规则';
+  document.getElementById('rule-form').action = '/rules';
+  document.getElementById('rule-id').value = '';
+  document.getElementById('rule-name').value = '';
+  document.getElementById('rule-desc').value = '';
+  document.getElementById('rule-type').value = 'STATUS_CHANGED';
+  document.getElementById('rule-anchor').value = '';
+  document.getElementById('rule-days-offset').value = '';
+  document.getElementById('rule-custom-date').value = '';
+  document.getElementById('rule-recurrence').value = '';
+  document.getElementById('rule-status-match').value = '';
+  document.getElementById('rule-subject').value = '[{{ status_tag }}] {{ name }} - {{ form_type }}';
+  document.getElementById('rule-body').value = '{{ name }} 的 {{ form_type }}（{{ receipt_number }}）需要处理。\n\n{{ status_title }}\n{{ status_description }}';
+  onTypeChange();
+  document.getElementById('rule-modal').classList.add('show');
+}
+
+function showEditModal(id) {
+  var r = RULE_DATA[id];
+  if (!r) return;
+  document.getElementById('modal-title').textContent = '编辑提醒规则';
+  document.getElementById('modal-submit-btn').textContent = '保存修改';
+  document.getElementById('rule-form').action = '/rules/' + id + '/edit';
+  document.getElementById('rule-id').value = id;
+  document.getElementById('rule-name').value = r.name;
+  document.getElementById('rule-desc').value = r.desc;
+  document.getElementById('rule-type').value = r.type;
+  document.getElementById('rule-anchor').value = r.anchor;
+  document.getElementById('rule-days-offset').value = r.daysOffset;
+  document.getElementById('rule-custom-date').value = r.customDate;
+  document.getElementById('rule-recurrence').value = r.recurrence;
+  document.getElementById('rule-status-match').value = r.statusMatch;
+  document.getElementById('rule-subject').value = r.subject;
+  document.getElementById('rule-body').value = r.body;
+  onTypeChange();
+  document.getElementById('rule-modal').classList.add('show');
+}
+
+function hideModal() {
+  document.getElementById('rule-modal').classList.remove('show');
+}
+
+function onTypeChange() {
+  var type = document.getElementById('rule-type').value;
+  var showAnchor = (type === 'RELATIVE_DATE');
+  var showOffset = (type === 'RELATIVE_DATE');
+  var showCustomDate = (type === 'ONE_TIME_DATE');
+  var showRecurrence = (type === 'RECURRING');
+  var showStatusMatch = (type === 'STATUS_MATCHED');
+
+  document.getElementById('anchor-group').style.display = showAnchor ? '' : 'none';
+  document.getElementById('offset-group').style.display = showOffset ? '' : 'none';
+  document.getElementById('custom-date-group').style.display = showCustomDate ? '' : 'none';
+  document.getElementById('recurrence-group').style.display = showRecurrence ? '' : 'none';
+  document.getElementById('status-match-group').style.display = showStatusMatch ? '' : 'none';
+}
+
+// 关闭弹窗：点击遮罩层
+document.getElementById('rule-modal').addEventListener('click', function(e) {
+  if (e.target === this) hideModal();
+});
+</script>
+{% endblock %}

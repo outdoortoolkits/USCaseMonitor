@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block title %}提醒记录{% endblock %}{% block content %}
+<div class="title-row"><div><h1>提醒与邮件记录</h1><p class="muted">企业收件人：{{ recipients|join(', ') if recipients else '尚未配置' }}</p></div><form method="post" action="/notifications/send"><button>发送待处理邮件</button></form></div>
+<section class="panel"><table><thead><tr><th>状态</th><th>邮件标题</th><th>尝试</th><th>创建时间</th><th>错误</th></tr></thead><tbody>{% for e in events %}<tr><td><span class="tag {{ e.status|lower }}">{{ e.status }}</span></td><td>{{ e.subject }}<small>{{ e.body[:100] }}</small></td><td>{{ e.attempts }}</td><td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td><td class="error-text">{{ e.error }}</td></tr>{% else %}<tr><td colspan="5" class="empty">尚无提醒事件</td></tr>{% endfor %}</tbody></table></section>
+{% endblock %}
+

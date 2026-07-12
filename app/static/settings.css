@@ -1,0 +1,5 @@
+.settings-grid { align-items: start; }
+.config-status { grid-template-columns: repeat(3, 1fr); }
+.config-status b { font-size: 20px; }
+.checkbox { display: flex; grid-template-columns: auto 1fr; align-items: center; gap: 8px; padding-bottom: 9px; }
+.checkbox input { width: auto; }

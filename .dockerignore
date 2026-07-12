@@ -1,0 +1,21 @@
+# 开发环境文件
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite3
+.pytest_cache/
+.DS_Store
+backups/
+
+# 浏览器用户数据
+.browser_profile/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/

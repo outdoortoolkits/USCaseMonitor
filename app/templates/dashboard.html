@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}看板 · USCaseMonitor{% endblock %}{% block content %}
+<h1>案件监控看板</h1>
+<section class="stats"><article><b>{{ stats.customers }}</b><span>客户</span></article><article><b>{{ stats.cases }}</b><span>监控案件</span></article><article><b>{{ stats.pending }}</b><span>待发提醒</span></article><article><b>{{ stats.errors }}</b><span>查询异常</span></article></section>
+<div class="grid two"><section class="panel"><h2>最近状态</h2><table><thead><tr><th>客户</th><th>案件</th><th>状态</th><th>查询时间</th></tr></thead><tbody>{% for s in snapshots %}<tr><td>{{ s.case.customer.name }}</td><td>{{ s.case.form_type }}<small>{{ s.case.receipt_number }}</small></td><td><span class="tag">{{ s.status_tag }}</span> {{ s.status_title }}</td><td>{{ s.checked_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% else %}<tr><td colspan="4" class="empty">尚无查询记录</td></tr>{% endfor %}</tbody></table></section>
+<section class="panel"><h2>批量任务</h2><table><thead><tr><th>状态</th><th>成功/失败</th><th>开始时间</th></tr></thead><tbody>{% for r in runs %}<tr><td>{{ r.status }}</td><td>{{ r.succeeded }}/{{ r.failed }}</td><td>{{ r.started_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% else %}<tr><td colspan="3" class="empty">Worker 尚未执行</td></tr>{% endfor %}</tbody></table></section></div>
+{% endblock %}
+

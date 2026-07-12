@@ -1,0 +1,207 @@
+{% extends "base.html" %}{% block title %}{{ customer.name }}{% endblock %}{% block content %}
+<div class="title-row">
+  <div>
+    <a href="/customers">← 返回客户列表</a>
+    <h1>{{ customer.name }}</h1>
+    <p class="muted">签约日期：{{ customer.sign_date or '未设置' }}　电话：{{ customer.phone or '未设置' }}　备注：{{ customer.remark or '无' }}</p>
+  </div>
+  <div class="action-btns">
+    <form method="post" action="/customers/{{ customer.id }}/poll-all"><button class="btn-secondary">📋 批量查询</button></form>
+    <form method="post" action="/customers/{{ customer.id }}/send"><button class="btn-secondary">✉ 发送邮件</button></form>
+  </div>
+</div>
+
+{# ── Tab 导航 ── #}
+<nav class="tabs">
+  <a class="tab active" data-tab="cases" onclick="switchTab('cases')">📁 案件状态 <span class="tab-count">{{ customer.cases|length }}</span></a>
+  <a class="tab" data-tab="rules" onclick="switchTab('rules')">⚙ 提醒规则 <span class="tab-count">{{ linked_rule_ids|length }}</span></a>
+  <a class="tab" data-tab="logs" onclick="switchTab('logs')">📋 查询日志</a>
+</nav>
+
+{# ── Tab: 案件状态 ── #}
+<div class="tab-panel active" id="panel-cases">
+
+<div class="add-case-bar">
+  <button class="btn-primary" onclick="toggleAddForm()" id="btn-add-case">＋ 添加申请案件</button>
+  <span class="muted" style="margin-left:10px">共 {{ customer.cases|length }} 个案件</span>
+</div>
+<div class="add-case-panel panel" id="add-case-form" style="display:none">
+  <div class="add-case-head">
+    <h2>添加申请案件</h2>
+    <button class="modal-close" onclick="toggleAddForm()">&times;</button>
+  </div>
+  <form method="post" action="/customers/{{ customer.id }}/cases" class="inline-form">
+    <label>表格类型<input name="form_type" required placeholder="I-129 / I-485 / N-400 ..."></label>
+    <label>收据编号<input name="receipt_number" required placeholder="EAC1234567890"></label>
+    <label>收据日期<input name="receipt_date" type="date"></label>
+    <button>确认添加</button>
+  </form>
+</div>
+
+{% if customer.cases %}
+{% for case in customer.cases %}
+<article class="case-card">
+  <div class="case-head">
+    <div>
+      <h3>
+        <span class="case-num">{{ loop.index }}</span>
+        {{ case.form_type }}
+        <span class="mono">{{ case.receipt_number }}</span>
+        {% if case.active %}<span class="tag active">监控中</span>{% else %}<span class="tag inactive">已停用</span>{% endif %}
+      </h3>
+      <p class="muted">收据日期：{{ case.receipt_date or '未设置' }} · 上次查询：{{ case.last_checked_at or '尚未查询' }}</p>
+    </div>
+    <form method="post" action="/cases/{{ case.id }}/poll"><button>🔍 查询 USCIS</button></form>
+  </div>
+
+  {% if case.last_error %}<div class="error">{{ case.last_error }}</div>{% endif %}
+
+  {% set snapshots = case.snapshots|sort(attribute='checked_at') %}
+  {% if snapshots %}
+  <div class="timeline">
+    {% for s in snapshots|reverse %}
+    <div class="tl-item {% if loop.first %}tl-latest{% endif %} {% if s.is_changed %}tl-changed{% endif %}">
+      <div class="tl-dot"></div>
+      <div class="tl-content">
+        <div class="tl-header">
+          <span class="tag {{ s.status_tag|lower }}">{{ s.status_tag }}</span>
+          <time>{{ s.checked_at.strftime('%Y-%m-%d %H:%M') }}</time>
+          {% if s.is_changed %}<span class="tl-badge">状态变更</span>{% endif %}
+        </div>
+        <div class="tl-title">{{ s.status_title }}</div>
+        <div class="tl-desc">{{ s.status_description }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">尚未查询，点击"查询 USCIS"获取最新状态。</p>
+  {% endif %}
+</article>
+{% endfor %}
+{% else %}
+<div class="panel" style="text-align:center;padding:40px">
+  <p class="muted" style="font-size:16px;margin-bottom:16px">该客户暂无申请案件</p>
+  <button class="btn-primary" onclick="toggleAddForm()">＋ 添加第一个案件</button>
+</div>
+{% endif %}
+
+</div>
+
+{# ── Tab: 提醒规则 — 客户选择/移除规则 ── #}
+<div class="tab-panel" id="panel-rules" style="display:none">
+
+<div style="margin-bottom:16px">
+  <a href="/rules" class="btn-secondary" style="display:inline-flex">📋 管理规则模板</a>
+</div>
+
+{# 已关联的规则 #}
+{% if linked_rule_ids %}
+<div class="panel" style="margin-bottom:16px">
+  <h2>已关联的提醒规则</h2>
+  <table>
+    <thead><tr><th>规则名称</th><th>类型</th><th>匹配状态</th><th>描述</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for rule in all_rules %}
+    {% if rule.id in linked_rule_ids %}
+    {% set link = linked_rule_map[rule.id] %}
+    <tr>
+      <td><b>{{ rule.name }}</b></td>
+      <td><span class="tag">{{ rule_type_labels.get(rule.rule_type.value, rule.rule_type.value) }}</span></td>
+      <td>{% if rule.status_match %}<code>{{ rule.status_match }}</code>{% else %}<span class="muted">不限</span>{% endif %}</td>
+      <td class="muted">{{ rule.description or '-' }}</td>
+      <td>
+        <form method="post" action="/customers/{{ customer.id }}/rules/{{ link.id }}/unlink" class="inline" onsubmit="return confirm('确定移除规则「{{ rule.name|e }}」？')">
+          <button class="btn-sm-danger">移除</button>
+        </form>
+      </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="panel empty" style="margin-bottom:16px">
+  <p>该客户尚未关联任何提醒规则，请在下方选择要启用的规则。</p>
+</div>
+{% endif %}
+
+{# 可选规则列表 #}
+<div class="panel">
+  <h2>可选规则模板</h2>
+  {% set ns = namespace(has_available=false) %}
+  {% for rule in all_rules %}
+    {% if rule.id not in linked_rule_ids %}
+      {% set ns.has_available = true %}
+    {% endif %}
+  {% endfor %}
+  {% if ns.has_available %}
+  <table>
+    <thead><tr><th>规则名称</th><th>类型</th><th>匹配状态</th><th>描述</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for rule in all_rules %}
+    {% if rule.id not in linked_rule_ids %}
+    <tr>
+      <td><b>{{ rule.name }}</b></td>
+      <td><span class="tag">{{ rule_type_labels.get(rule.rule_type.value, rule.rule_type.value) }}</span></td>
+      <td>{% if rule.status_match %}<code>{{ rule.status_match }}</code>{% else %}<span class="muted">不限</span>{% endif %}</td>
+      <td class="muted">{{ rule.description or '-' }}</td>
+      <td>
+        <form method="post" action="/customers/{{ customer.id }}/rules/{{ rule.id }}/link" class="inline">
+          <button class="btn-sm">＋ 关联</button>
+        </form>
+      </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">暂无更多可选规则。请先到 <a href="/rules">规则模板管理</a> 创建新规则。</p>
+  {% endif %}
+</div>
+</div>
+
+{# ── Tab: 查询日志 ── #}
+<div class="tab-panel" id="panel-logs" style="display:none">
+{% set all_snapshots = [] %}
+{% for case in customer.cases %}
+  {% for s in case.snapshots|sort(attribute='checked_at') %}
+    {% set _ = all_snapshots.append((s, case)) %}
+  {% endfor %}
+{% endfor %}
+
+{% if all_snapshots %}
+<table>
+  <thead><tr><th>时间</th><th>案件</th><th>状态</th><th>详情</th><th>标记</th></tr></thead>
+  <tbody>
+  {% for s, case in all_snapshots|reverse %}
+  <tr>
+    <td>{{ s.checked_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    <td>{{ case.form_type }} <span class="mono">{{ case.receipt_number }}</span></td>
+    <td><span class="tag {{ s.status_tag|lower }}">{{ s.status_tag }}</span></td>
+    <td>{{ s.status_title[:60] }}{% if s.status_title|length > 60 %}...{% endif %}</td>
+    <td>{% if s.is_changed %}<span class="tl-badge">变更</span>{% else %}<span class="muted">-</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">暂无查询记录</p>
+{% endif %}
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+  document.querySelector('[data-tab="' + name + '"]').classList.add('active');
+  document.getElementById('panel-' + name).style.display = '';
+}
+function toggleAddForm() {
+  var panel = document.getElementById('add-case-form');
+  panel.style.display = panel.style.display === 'none' ? '' : 'none';
+}
+</script>
+{% endblock %}
